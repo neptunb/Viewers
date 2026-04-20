@@ -34,6 +34,14 @@ export default function getImageId({ instance, frame, config, thumbnail = false 
   }
 
   if (instance.url) {
+    // Multi-frame support: append `frame=N` to the instance URL so each frame
+    // gets a unique imageId. Without this, cornerstone caches all frames under
+    // the same imageId and only the first frame is ever displayed (NM, XA,
+    // enhanced CT/MR multi-frame objects were all affected).
+    if (frame !== undefined) {
+      const separator = instance.url.includes('?') ? '&' : '?';
+      return `${instance.url}${separator}frame=${frame}`;
+    }
     return instance.url;
   }
 

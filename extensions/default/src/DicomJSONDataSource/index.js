@@ -89,9 +89,34 @@ function createDicomJSONApi(dicomJsonConfig) {
 
           series.instances.forEach(instance => {
             const { metadata: naturalizedDicom } = instance;
-            const imageId = getImageId({ instance, config: dicomJsonConfig });
-
             const { query } = qs.parseUrl(instance.url);
+            const NumberOfFrames = naturalizedDicom.NumberOfFrames || 1;
+
+            // For multi-frame instances (NM, XA, enhanced CT/MR, etc.) we need
+            // one imageId per frame so each frame can be resolved back to its
+            // SOPInstanceUID + frameNumber. Otherwise only the first frame is
+            // ever displayable and the viewer gets stuck on "Loading" when
+            // navigating to any other frame.
+            if (NumberOfFrames > 1 && query.frame === undefined) {
+              // Frame numbers in imageIds are 1-based to match DICOM and the
+              // cornerstone wadouri loader's expectation (see parseImageId).
+              for (let frameNumber = 1; frameNumber <= NumberOfFrames; frameNumber++) {
+                const imageId = getImageId({
+                  instance,
+                  frame: frameNumber,
+                  config: dicomJsonConfig,
+                });
+                metadataProvider.addImageIdToUIDs(imageId, {
+                  StudyInstanceUID,
+                  SeriesInstanceUID,
+                  SOPInstanceUID: naturalizedDicom.SOPInstanceUID,
+                  frameNumber,
+                });
+              }
+              return;
+            }
+
+            const imageId = getImageId({ instance, config: dicomJsonConfig });
 
             // Add imageId specific mapping to this data as the URL isn't necessarily WADO-URI.
             metadataProvider.addImageIdToUIDs(imageId, {
@@ -280,9 +305,14 @@ function createDicomJSONApi(dicomJsonConfig) {
         const NumberOfFrames = instance.NumberOfFrames || 1;
         const instances = instanceMap.get(instance.SOPInstanceUID) || [instance];
         for (let i = 0; i < NumberOfFrames; i++) {
+          // cornerstone-dicom-image-loader's wadouri parser expects 1-based
+          // frame numbers in the imageId (it subtracts 1 internally to get the
+          // 0-based pixelDataFrame). Passing a 0-based index produced an
+          // invalid frame=-1 request for the first frame and skipped the last
+          // frame entirely in multi-frame NM/XA studies.
           const imageId = getImageId({
             instance: instances[Math.min(i, instances.length - 1)],
-            frame: NumberOfFrames > 1 ? i : undefined,
+            frame: NumberOfFrames > 1 ? i + 1 : undefined,
             config: dicomJsonConfig,
           });
           imageIds.push(imageId);
