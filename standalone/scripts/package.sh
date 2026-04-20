@@ -23,6 +23,11 @@ if [ ! -f "${EMBED_DIR}/index.html" ]; then
   exit 1
 fi
 
+if ! command -v go >/dev/null 2>&1; then
+  echo "error: Go is not installed or not on PATH (need go >= 1.22 for standalone/launcher). Install from https://go.dev/dl/ and retry." >&2
+  exit 127
+fi
+
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}/study"
 
