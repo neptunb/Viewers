@@ -24,7 +24,11 @@ class MetadataProvider {
     // This method is a fallback for when you don't have WADO-URI or WADO-RS.
     // You can add instances fetched by any method by calling addInstance, and hook an imageId to point at it here.
     // An example would be dicom hosted at some random site.
-    const imageURI = imageIdToURI(imageId);
+    // getUIDsFromImageID strips "&frame=" before lookup and re-attaches the
+    // frameNumber parsed from each imageId's URL, so registrations must be
+    // keyed frame-free as well; otherwise multi-frame instances (NM/PT)
+    // never match and isValidVolume crashes destructuring { modality }.
+    const imageURI = imageIdToURI(imageId).split('&frame=')[0];
     this.imageURIToUIDs.set(imageURI, uids);
   }
 
